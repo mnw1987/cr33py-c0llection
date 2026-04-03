@@ -686,7 +686,6 @@
 
   function renderMenu(){
     return el("div",{},[
-      el("div",{class:"app-pill"},["📱 ", "Tablet shop mode"]),
       buttonHome("Bundles","btn-home-a","🦇","✨",()=>{ state.screen="bundles"; render(); }),
       buttonHome("Single Items","btn-home-b","🦇","💖",()=>{ state.screen="singles"; render(); })
     ]);
