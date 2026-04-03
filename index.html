@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#5c0f87">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>Creepy Collection</title>
   <style>
     :root {
@@ -161,6 +164,145 @@
     .slash.small { width: 3px; height: 44px; box-shadow: 0 0 8px rgba(196,120,255,.95); }
     .spark { position: absolute; color: #f6d8ff; text-shadow: 0 0 12px rgba(208,126,255,1); font-weight: 900; }
     .spark.cyan { color: #d8f7ff; }
+    .qty-wrap {
+      display: grid;
+      grid-template-columns: 42px 52px 42px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .qty-btn {
+      min-height: 42px;
+      min-width: 42px;
+      padding: 0;
+      border-radius: 16px;
+      font-size: 24px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .qty-display {
+      min-height: 42px;
+      border: 2px solid rgba(255,255,255,.55);
+      border-radius: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 900;
+      color: #fff7fe;
+      background: rgba(39, 4, 56, .55);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+    }
+
+    .qty-wrap.disabled .qty-display {
+      opacity: .72;
+      background: rgba(30, 18, 34, .65);
+    }
+
+    .receipt-panel {
+      background:
+        linear-gradient(180deg, #fffdfd 0%, #fff2fa 100%);
+      color: #2e1232;
+      border-color: rgba(255,120,204,.65);
+    }
+
+    .receipt-panel:before,
+    .receipt-panel:after {
+      border-color: rgba(205, 96, 173, .35);
+    }
+
+    .receipt-top {
+      text-align: center;
+      padding-bottom: 12px;
+      border-bottom: 2px dashed rgba(76, 12, 96, .22);
+      margin-bottom: 12px;
+    }
+
+    .receipt-title {
+      font-size: 30px;
+      font-weight: 900;
+      margin: 0 0 4px;
+      color: #4a0c60;
+    }
+
+    .receipt-sub {
+      font-size: 12px;
+      color: #7b4a7e;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .receipt-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 12px;
+      color: #6b4a71;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .receipt-line {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px dashed rgba(76, 12, 96, .16);
+    }
+
+    .receipt-line-title {
+      font-weight: 900;
+      color: #4a0c60;
+      line-height: 1.2;
+    }
+
+    .receipt-line-sub {
+      font-size: 12px;
+      color: #7a5b82;
+      margin-top: 3px;
+    }
+
+    .receipt-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-top: 14px;
+      margin-top: 8px;
+      border-top: 2px dashed rgba(76, 12, 96, .22);
+      font-size: 24px;
+      font-weight: 900;
+      color: #4a0c60;
+    }
+
+    .receipt-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .app-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.12);
+      color: #ffe1f6;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      border: 1px solid rgba(255,255,255,.18);
+    }
+
+
     @media (max-width: 420px) {
       .header h1 { font-size: 24px; }
       .btn-home-a, .btn-home-b { font-size: 28px; min-height: 122px; }
@@ -224,12 +366,16 @@
     { id:"gold-laptop", name:"Gold Laptop", price:360, pet:false }
   ].sort((a,b)=>a.price-b.price || a.name.localeCompare(b.name));
 
+  const QTY_ITEM_IDS = ITEMS.slice(0, 10).map(item => item.id);
+
   const state = {
     screen: "login",
     password: "",
     error: "",
     basket: [],
+    quantities: {},
     modalBundle: null,
+    lastReceipt: null,
     cursor: { x:0, y:0, visible:false },
     showCursor: window.matchMedia && window.matchMedia("(pointer:fine)").matches
   };
@@ -279,9 +425,28 @@
       </div>`;
   }
 
+  
+  function isQtyItem(itemId){
+    return QTY_ITEM_IDS.indexOf(itemId) > -1;
+  }
+
+  function qtyValue(itemId){
+    return Number(state.quantities[itemId] || 0);
+  }
+
+  function setQty(itemId, nextQty){
+    const clamped = Math.max(0, Math.min(9, nextQty));
+    if (clamped === 0) delete state.quantities[itemId];
+    else state.quantities[itemId] = clamped;
+    render();
+  }
+
   function selectedItemIds(){
     const ids = new Set();
     state.basket.forEach(entry => entry.itemIds.forEach(id => ids.add(id)));
+    Object.keys(state.quantities).forEach(id => {
+      if (qtyValue(id) > 0) ids.add(id);
+    });
     return ids;
   }
 
@@ -293,6 +458,54 @@
     return ids;
   }
 
+  function basketCount(){
+    return state.basket.length + Object.keys(state.quantities).reduce((sum, id) => sum + qtyValue(id), 0);
+  }
+
+  function basketHasAny(){
+    return state.basket.length > 0 || Object.keys(state.quantities).some(id => qtyValue(id) > 0);
+  }
+
+  function basketTotal(){
+    let total = state.basket.reduce((sum, entry) => sum + entry.price, 0);
+    Object.keys(state.quantities).forEach(id => {
+      const item = ITEMS.find(x => x.id === id);
+      if (item) total += item.price * qtyValue(id);
+    });
+    return total;
+  }
+
+  function currentReceiptLines(){
+    const lines = state.basket.map(entry => ({
+      label: entry.label,
+      qty: 1,
+      unit: entry.price,
+      total: entry.price
+    }));
+    Object.keys(state.quantities).forEach(id => {
+      const qty = qtyValue(id);
+      if (!qty) return;
+      const item = ITEMS.find(x => x.id === id);
+      if (!item) return;
+      lines.push({
+        label: item.name,
+        qty: qty,
+        unit: item.price,
+        total: item.price * qty
+      });
+    });
+    return lines;
+  }
+
+  function buildReceipt(){
+    return {
+      number: String(Date.now()).slice(-6),
+      when: new Date().toLocaleString("en-GB"),
+      lines: currentReceiptLines(),
+      total: basketTotal()
+    };
+  }
+
   function bundleStatus(bundle){
     if (selectedBundleIds().has(bundle.id)) return { disabled:true, note:"Already in basket", button:"Added" };
     const allItems = [].concat(bundle.itemIds || [], bundle.choiceItems || []);
@@ -302,9 +515,15 @@
   }
 
   function singleStatus(item){
-    if (state.basket.some(entry => entry.type === "single" && entry.id === item.id)) return { disabled:true, note:"Already in basket", button:"Added" };
     const chosenBundle = state.basket.find(entry => entry.type === "bundle" && entry.itemIds.includes(item.id));
     if (chosenBundle) return { disabled:true, note:"Included in " + chosenBundle.label, button:"Included" };
+
+    if (isQtyItem(item.id)){
+      const qty = qtyValue(item.id);
+      return { disabled:false, note: qty > 0 ? "Quantity in basket: " + qty : "Use + or -", button:"Qty" };
+    }
+
+    if (state.basket.some(entry => entry.type === "single" && entry.id === item.id)) return { disabled:true, note:"Already in basket", button:"Added" };
     return { disabled:false, note:item.pet ? "Pet item" : "Tap to add", button:"Add" };
   }
 
@@ -371,6 +590,11 @@
     render();
   }
 
+  function clearQtyItem(itemId){
+    delete state.quantities[itemId];
+    render();
+  }
+
   function removeBasketItem(index){
     state.basket = state.basket.filter((_,i)=>i!==index);
     render();
@@ -378,6 +602,8 @@
 
   function clearSale(){
     state.basket = [];
+    state.quantities = {};
+    state.lastReceipt = null;
     state.screen = "menu";
     render();
   }
@@ -392,7 +618,7 @@
         el("h1",{text:"Creepy Collection"}),
         el("div",{class:"sub",text:"Hope you enjoy poop2, Love from Pooh"})
       ]),
-      buttonSmall("🧺 Basket (" + state.basket.length + ")", ()=>{ state.screen="basket"; render(); }, "header-basket")
+      buttonSmall("🧺 Basket (" + basketCount() + ")", ()=>{ state.screen="basket"; render(); }, "header-basket")
     ]);
   }
 
@@ -423,6 +649,7 @@
   function renderLogin(){
     return el("div",{class:"panel"},[
       el("div",{class:"panel-inner"},[
+        el("div",{class:"app-pill"},["📱 ", "Tap like an app"]),
         el("div",{class:"login-icon",text:"🔒"}),
         el("div",{class:"title-center"},[
           el("h2",{text:"Welcome"}),
@@ -459,6 +686,7 @@
 
   function renderMenu(){
     return el("div",{},[
+      el("div",{class:"app-pill"},["📱 ", "Tablet shop mode"]),
       buttonHome("Bundles","btn-home-a","🦇","✨",()=>{ state.screen="bundles"; render(); }),
       buttonHome("Single Items","btn-home-b","🦇","💖",()=>{ state.screen="singles"; render(); })
     ]);
@@ -490,6 +718,47 @@
     },[
       !disabled ? el("div",{class:"midline"}) : null,
       el("span",{class:"coffin-label"},[icon + " ", label])
+    ]);
+  }
+
+
+  function quantityControl(item, includedInBundle){
+    const wrap = el("div",{class:"qty-wrap" + (includedInBundle ? " disabled" : "")});
+    const minus = el("button",{
+      class:"btn qty-btn",
+      disabled: includedInBundle || qtyValue(item.id) <= 0 ? "disabled" : null,
+      onclick:(e)=>{
+        e.preventDefault();
+        addBurst(e.clientX,e.clientY);
+        setQty(item.id, qtyValue(item.id) - 1);
+      }
+    },"−");
+    const display = el("div",{class:"qty-display",text:String(qtyValue(item.id))});
+    const plus = el("button",{
+      class:"btn qty-btn",
+      disabled: includedInBundle || qtyValue(item.id) >= 9 ? "disabled" : null,
+      onclick:(e)=>{
+        e.preventDefault();
+        addBurst(e.clientX,e.clientY);
+        setQty(item.id, qtyValue(item.id) + 1);
+      }
+    },"+");
+    wrap.appendChild(minus);
+    wrap.appendChild(display);
+    wrap.appendChild(plus);
+    return wrap;
+  }
+
+  function productCardCustom(data, idx, controlNode, disabled){
+    return el("div",{class:"product " + shapeClass(idx) + (disabled ? " muted" : "")},[
+      el("div",{class:"product-inner"},[
+        el("div",{class:"product-left"},[
+          el("div",{class:"product-title",text:data.title}),
+          el("div",{class:tagClass(idx),text:data.note}),
+          el("div",{class:"price",text:data.price})
+        ]),
+        controlNode
+      ])
     ]);
   }
 
@@ -527,6 +796,7 @@
     return wrap;
   }
 
+  
   function renderSingles(){
     const wrap = el("div",{},[
       renderBackHeader("Single Items"),
@@ -534,21 +804,35 @@
     ]);
     ITEMS.forEach((item, idx)=>{
       const status = singleStatus(item);
-      wrap.appendChild(productCard({
-        title: item.name,
-        note: status.note,
-        price: formatPrice(item.price),
-        icon: item.pet ? "✨" : "⚰"
-      }, idx, ()=>addSingle(item), status.disabled, status.button));
+      const includedInBundle = state.basket.some(entry => entry.type === "bundle" && entry.itemIds.includes(item.id));
+      if (isQtyItem(item.id)){
+        wrap.appendChild(productCardCustom({
+          title: item.name,
+          note: status.note,
+          price: formatPrice(item.price),
+          icon: item.pet ? "✨" : "⚰"
+        }, idx, quantityControl(item, includedInBundle), includedInBundle));
+      } else {
+        wrap.appendChild(productCard({
+          title: item.name,
+          note: status.note,
+          price: formatPrice(item.price),
+          icon: item.pet ? "✨" : "⚰"
+        }, idx, ()=>addSingle(item), status.disabled, status.button));
+      }
     });
     return wrap;
   }
 
+  
   function renderBasket(){
-    const wrap = el("div",{},[renderBackHeader("Basket")]);
+    const wrap = el("div",{},[
+      renderBackHeader("Basket"),
+      el("div",{class:"app-pill"},["🧾 ", "Receipt ready when you pay"])
+    ]);
     const panel = el("div",{class:"panel"},[
       el("div",{class:"panel-inner"},[
-        state.basket.length === 0 ? el("div",{class:"center",style:"padding:22px 0;color:#ffd4ef;font-weight:900",text:"Basket is empty"}) : null
+        !basketHasAny() ? el("div",{class:"center",style:"padding:22px 0;color:#ffd4ef;font-weight:900",text:"Basket is empty"}) : null
       ])
     ]);
     const inner = panel.querySelector(".panel-inner");
@@ -561,28 +845,69 @@
         buttonSmall("🗑", ()=>removeBasketItem(index))
       ]));
     });
+    Object.keys(state.quantities).forEach((id)=>{
+      const qty = qtyValue(id);
+      if (!qty) return;
+      const item = ITEMS.find(x => x.id === id);
+      if (!item) return;
+      inner.appendChild(el("div",{class:"basket-item"},[
+        el("div",{},[
+          el("div",{class:"basket-item-title",text:item.name + " x" + qty}),
+          el("div",{class:"help-text",text:formatPrice(item.price) + " each • " + formatPrice(item.price * qty)})
+        ]),
+        buttonSmall("🗑", ()=>clearQtyItem(id))
+      ]));
+    });
     wrap.appendChild(panel);
     wrap.appendChild(el("div",{class:"panel basket-total"},[
       el("div",{class:"panel-inner",style:"display:flex;justify-content:space-between;align-items:center;padding:16px 18px"},[
         el("div",{style:"font-size:24px;font-weight:900",text:"Total"}),
-        el("div",{style:"font-size:30px;font-weight:900",text:formatPrice(state.basket.reduce((s,x)=>s+x.price,0))})
+        el("div",{style:"font-size:30px;font-weight:900",text:formatPrice(basketTotal())})
       ])
     ]));
     wrap.appendChild(el("div",{class:"top-actions"},[
       el("button",{class:"btn btn-small",style:"flex:1;border-radius:22px 12px 22px 12px;background:white",onclick:(e)=>{ addBurst(e.clientX,e.clientY); clearSale(); }},"Clear"),
-      el("button",{class:"btn btn-small",style:"flex:1;border-radius:12px 22px 12px 22px",disabled:state.basket.length ? null : "disabled",onclick:(e)=>{ if (!state.basket.length) return; addBurst(e.clientX,e.clientY); state.screen='paid'; render(); }},"Pretend Pay")
+      el("button",{class:"btn btn-small",style:"flex:1;border-radius:12px 22px 12px 22px",disabled:basketHasAny() ? null : "disabled",onclick:(e)=>{ if (!basketHasAny()) return; addBurst(e.clientX,e.clientY); state.lastReceipt = buildReceipt(); state.screen='paid'; render(); }},"Pretend Pay")
     ]));
     return wrap;
   }
 
+  
   function renderPaid(){
-    return el("div",{class:"panel"},[
-      el("div",{class:"panel-inner center"},[
-        el("div",{class:"login-icon",style:"background:linear-gradient(180deg,#ff8cd0,#ff4eb0)",text:"✔"}),
-        el("div",{style:"font-size:38px;font-weight:900;margin-top:4px",text:"Payment Done"}),
-        el("div",{class:"help-text",style:"font-weight:700;margin-top:10px",text:"Pretend total paid: " + formatPrice(state.basket.reduce((s,x)=>s+x.price,0))}),
-        el("button",{class:"btn btn-small",style:"width:100%;min-height:56px;border-radius:22px 12px 22px 12px;margin-top:16px",onclick:(e)=>{ addBurst(e.clientX,e.clientY); state.basket=[]; state.screen='menu'; render(); }},"New Sale")
+    const receipt = state.lastReceipt || buildReceipt();
+    const panel = el("div",{class:"panel receipt-panel"},[
+      el("div",{class:"panel-inner"},[
+        el("div",{class:"receipt-top"},[
+          el("div",{class:"receipt-title",text:"Receipt"}),
+          el("div",{class:"receipt-sub",text:"Creepy Collection"})
+        ]),
+        el("div",{class:"receipt-meta"},[
+          el("div",{text:"Receipt #" + receipt.number}),
+          el("div",{text:receipt.when})
+        ])
       ])
+    ]);
+    const inner = panel.querySelector(".panel-inner");
+    receipt.lines.forEach((line)=>{
+      inner.appendChild(el("div",{class:"receipt-line"},[
+        el("div",{},[
+          el("div",{class:"receipt-line-title",text:line.label}),
+          el("div",{class:"receipt-line-sub",text:"Qty " + line.qty + " • " + formatPrice(line.unit) + " each"})
+        ]),
+        el("div",{class:"receipt-line-title",style:"align-self:center",text:formatPrice(line.total)})
+      ]));
+    });
+    inner.appendChild(el("div",{class:"receipt-total"},[
+      el("div",{text:"Total"}),
+      el("div",{text:formatPrice(receipt.total)})
+    ]));
+    inner.appendChild(el("div",{class:"receipt-actions"},[
+      el("button",{class:"btn btn-small",style:"background:white;border-radius:22px 12px 22px 12px",onclick:(e)=>{ addBurst(e.clientX,e.clientY); state.screen='basket'; render(); }},"Back"),
+      el("button",{class:"btn btn-small",style:"border-radius:12px 22px 12px 22px",onclick:(e)=>{ addBurst(e.clientX,e.clientY); clearSale(); }},"New Sale")
+    ]));
+    return el("div",{},[
+      renderBackHeader("Receipt"),
+      panel
     ]);
   }
 
